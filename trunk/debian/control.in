@@ -1,0 +1,22 @@
+Source: flacenstein
+Section: audio
+Priority: optional
+Maintainer: Michael Dickerson <mikey@singingtree.com>
+Build-Depends: @cdbs@, python (>= 2.3.5), python-dev (>= 2.3.5)
+Standards-Version: 3.6.2
+
+Package: flacenstein
+Architecture: all
+Depends: ${python:Depends}, python-wxgtk2.6, python-flac, flac, flac-image, cdparanoia, python-musicbrainz
+Recommends: lame, oggenc, faac
+Description: FLAC librarian and transcoder with wxWidgets GUI
+  Flacenstein creates, organizes, and transcodes a particular type
+  of FLAC file: ones with embedded cuesheets, VORBIS style comment
+  blocks, and (optionally) cover art embedded with the flac-image
+  tool.  That is, it stores all the information easily obtained from
+  a CD in one convenient file.  These files are directly supported by
+  some players, such as the Slim Devices slimserver.
+  .
+  A libparanoia-based ripper and the ability to transcode FLAC files to
+  lossy formats such as MP3 and MPEG4/AAC (for the iPod) are provided.
+

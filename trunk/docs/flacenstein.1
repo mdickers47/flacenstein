@@ -1,0 +1,77 @@
+.TH FLACENSTEIN 1 "5 January 2006"
+.SH NAME
+flacenstein \- creates, organizes, and transcodes FLAC audio files
+.SH SYNOPSIS
+.B flacenstein
+.RI [\-rip]
+.SH DESCRIPTION
+.B flacenstein
+is a GUI program to rip, organize, and transcode FLAC files that represent
+entire albums.  Flacenstein's FLAC files contain embedded cuesheets that divide
+the album into tracks, a VORBIS comment block that identifies them, and an
+APPLICATION block that contains a cover art image.  These are standard FLAC
+files, but Flacenstein will not create, nor gracefully handle, other standard
+FLAC files that do not follow these conventions.
+.br
+The author finds this to be a convenient format for digitising music CDs,
+because it losslessly represents all of the information that can readily
+be extracted from the disc in a single file.  The two main functions of
+.B flacenstein
+are to create these files with minimal effort, and transcode them to
+the various (lossy) formats that are needed by portable players such as
+the iPod.
+.SS Ripping
+.B flacenstein
+contains a ripper based on cdparanoia, which means that it can be slow, but
+but it extracts the highest quality copies that are possible, even from
+damaged discs.  It uses the musicbrainz and CDDB databases to automatically
+identify and tag most discs.   The cover art is automatically retrieved from Amazon 
+if it is available.
+.br
+The ripper needs a "work path" (typically /tmp) which has enough space to
+contain the raw CDDA, which can be 700 to 800 MB.  The "final output path"
+is, obviously, where the finished FLAC files will end up.
+.SS Transcoding
+.B flacenstein
+uses plugins to define the various transformations that can be applied to
+the music library.  The three provided by the author are MP3 (requires
+.B lame
+), MPEG4/AAC (requires
+.B faac
+), and Ogg Vorbis (requires
+.B oggenc
+).  Each of these transformations produces one file per track, instead
+of one file per album as the FLACs are stored.  If flacenstein can't find
+the helper programs required by a plugin, that plugin will be disabled, but
+other features can still be used.
+.br
+In the main flacenstein GUI window, the selection status of each FLAC can be
+toggled by right clicking with the mouse.  Then select "Configure" on the
+Transform menu, and set the output path.  You can then start the transcoding
+process from the Transcode menu.  This can take quite a long time.  To save
+time, the output plugins will skip re-encoding any files that already exist
+in the output directory.
+.br
+.B flacenstein
+can run an arbitrary number of encoding threads in parallel, if you have
+a SMP machine or OpenMOSIX.  This is configured in the file flaccfg.py,
+distributed as part of flacenstein.  With 12 threads running on an OpenMOSIX
+cluster, the author is able to transcode as many as 300 albums per hour.
+.SS "Other features"
+Choose "Export list" from the Library menu to create a text file listing
+all of your FLAC albums.  It is also possible to save and restore 
+selection sets, which can be useful if you want to exclude certain
+albums from your regular iPod update, for example.
+.SH OPTIONS
+.TP
+.B \-rip
+Go directly to the ripper, bypassing the main GUI window.
+.SH SEE ALSO
+.BR flac (1),
+.BR metaflac (1),
+.BR flac-image (1),
+.BR cdparanoia (1)
+.SH AUTHOR
+flac-image was written by Michael A. Dickerson <mikey@singingtree.com>.  His web 
+page, which might or might not have more information about this program, is at
+http://obstrepero.us.
