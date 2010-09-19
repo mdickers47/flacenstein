@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Flacenstein FLAC librarian
+Comment=Rip and transcode FLAC lossless audio files
+GenericName=FLAC librarian
+Exec=flacenstein
+Icon=/usr/share/flacenstein/flacenstein-icon.png
+Terminal=false
+MultipleArgs=false
+Type=Application
+Categories=Application;Utility
+StartupNotify=true

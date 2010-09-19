@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Script I used once to reorganize an entire tree of FLAC files by
+# year.  May very well never be useful again.
+#
+#DRYRUN=1
+for F in "$@"; do
+  DEST=/media/savah/Music/flac/`flac-year "$F"`
+  SRC_SIZE=`stat -c %s "$1"`
+  DEST_SIZE=`stat -c %s "$DEST/$1" 2>/dev/null` || DEST_SIZE=0
+  if [ $SRC_SIZE -ne $DEST_SIZE ]; then
+    ${DRYRUN:+echo} mkdir -p "$DEST"
+    ${DRYRUN:+echo} cp -v "$1" "$DEST"
+  else
+    echo $DEST/$1 already exists
+  fi
+done
