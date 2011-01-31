@@ -5,7 +5,7 @@ itself, if ripping is all you are doing.  Otherwise you want to start
 the program by running flacapp.py.
 
 This depends on (at least) the following binaries:
-  cdparanoia, flac, metaflac, flac-image
+  cdparanoia, flac, metaflac
 
 Also the following Python modules:
   musicbrainz2 CDDB DiscID wx wxversion
@@ -129,10 +129,8 @@ class frmRipper(wx.Frame):
                                     style=wx.BU_LEFT)
         self.chkEject = wx.CheckBox(self, -1, "Eject CD when done")
         self.lblCoverArt = wx.StaticText(self, -1, "Cover Art (APPLICATION blocks):")
-        #self.bmpCoverArt = wx.StaticBitmap(self, -1, wx.EmptyBitmap(120, 120),
-        #                                   style=wx.SIMPLE_BORDER)
-        self.bmpCoverArt = wx.StaticBitmap(self, -1, wx.Bitmap("colorfulcd.jpg", \
-                                                               wx.BITMAP_TYPE_ANY)) 
+        self.bmpCoverArt = wx.StaticBitmap(self, -1, wx.EmptyBitmap(120, 120),
+                                           style=wx.SIMPLE_BORDER)
         self.lblCoverArtFilename = wx.StaticText(self, -1, "None Selected")
         self.lblMimeType = wx.StaticText(self, -1, "application/unknown")
         self.lblCoverArtSize = wx.StaticText(self, -1, "0 bytes")
@@ -274,8 +272,7 @@ class frmRipper(wx.Frame):
             m.ShowModal()
             m.Destroy()
             self.Destroy()
-            
-        
+
     def OnChooseCoverArt(self, e):
         d = wx.FileDialog(self, "Select cover art image", "", "",
                           IMAGE_FILTER, wx.OPEN)
@@ -304,7 +301,7 @@ class frmRipper(wx.Frame):
         """
         this is what runs when the "Detect CD" button is clicked (believe it or
         not).  First we try to identify the CD using the musicbrainz library,
-        then cddb if that fails, then give up.
+        then cddb, if that fails, then give up.
         """
         if self.cmdDetectCD.GetValue():
             self.goToWorkDir()
@@ -332,15 +329,19 @@ class frmRipper(wx.Frame):
                 # try to use musicbrainz library to at least find out the
                 # number of tracks
                 disc = mbdisc.readDisc(self.cddevice)
-                tracks = disc.lastTrackNum
-                tracks -= disc.firstTrackNum
-                tracks += 1
-                for i in range(0, tracks): info.titles[i] = ""
+                for i in range(disc.firstTrackNum, disc.lastTrackNum + 1):
+                    info.titles[i] = ""
 
-            # get cover art from Amazon, bless their hearts
+            # get cover art from Amazon
             if info.artist and info.album:
                 wx.LogMessage("searching Amazon for cover art")
-                info.releasedate, urls = amazon.SearchForCoverArt(info.artist, info.album)
+                urls = None
+                try:
+                    info.releasedate, urls = amazon.LookupDisc(info.artist,
+                                                               info.album)
+                except amazon.NoAmazonKeys:
+                    wx.LogMessage("not configured with amazon keys; skipping")
+
                 # urls is a list, but we only bother with the first entry
                 if urls:
                     data = urllib.urlopen(urls[0])
@@ -403,25 +404,6 @@ class frmRipper(wx.Frame):
 
         return ret
 
-    # FIXME
-        
-        if self.cddevice: mb.SetDevice(self.cddevice)
-        mb.SetDepth(2)
-        mb.Query(MBQ_GetCDInfo)
-        matches = mb.GetResultInt(MBE_GetNumAlbums)
-        if matches >= 1:
-            ret = cdinfo()
-            wx.LogMessage("musicbrainz succeeded (%d matches)" % matches)
-            mb.Select1(MBS_SelectAlbum, 1)
-            ret.artist = mb.GetResultData1(MBE_AlbumGetArtistName, 1)
-            ret.album = mb.GetResultData(MBE_AlbumGetAlbumName)
-            tracks = mb.GetResultInt(MBE_AlbumGetNumTracks)
-            for i in range(1, tracks + 1):
-                ret.titles[i] = mb.GetResultData1(MBE_AlbumGetTrackName, i)
-            return ret
-        else:
-            return None
-
     def _lookup_cddb(self):
         """
         returns a cdinfo() instance containing the information we found in
@@ -456,8 +438,7 @@ class frmRipper(wx.Frame):
             elif key == 'DYEAR':
                 ret.releasedate = info[key]
         wx.LogMessage("cddb succeeded")
-        return ret
-    
+        return ret    
 
     def OnRip(self, e):
         """
@@ -800,6 +781,3 @@ if __name__ == '__main__':
     f.Show(1)
     app.MainLoop()
     print "See You Space Cowboy"
-    
-        
-
