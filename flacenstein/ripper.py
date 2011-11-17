@@ -254,7 +254,7 @@ class frmRipper(wx.Frame):
     def CheckBinaries(self):
         """
         tests whether the various programs we need to run can be run, and
-        self-desstructs if not.
+        self-destructs if not.
         """
         msg = ''
         if not flaclib.check_binary('%s -v' % flaccfg.BIN_FLAC, 'flac [\d\.]+'):
