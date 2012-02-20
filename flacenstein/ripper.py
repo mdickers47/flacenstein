@@ -380,9 +380,9 @@ class frmRipper(wx.Frame):
             # go back for full details on the first match
             wx.LogMessage('musicbrains found %d matches' % len(matches))
             release = matches[0].release
-            inc = mbws.ReleaseIncludes(artist=True, tracks=True,
-                                       releaseEvents=True)
-            release = q.getReleaseById(release.getId(), inc)
+            #inc = mbws.ReleaseIncludes(artist=True, tracks=True,
+            #                           releaseEvents=True)
+            #release = q.getReleaseById(release.getId(), inc)
             
             isOneArtist = release.isSingleArtistRelease()
             ret = cdinfo()

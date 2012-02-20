@@ -55,6 +55,10 @@ def _urlencode_right(d):
 
 def _MakeAmazonUrl(d):
     d.setdefault('Service', 'AWSECommerceService')
+    # NB: I include an associate tag because the API fails without it.  It
+    # makes no difference because there is no means of buying the CD from
+    # flacenstein, and the tag actually doesn't even work anymore.
+    d.setdefault('AssociateTag', 'singingtree-20')
     d.setdefault('AWSAccessKeyId', _GetAmazonKeys()[0])
     d.setdefault('Timestamp', time.strftime('%Y-%m-%dT%H:%M:%SZ', 
                                             time.gmtime()))

@@ -11,12 +11,12 @@ FLAC=$1
 TRACK=$2
 
 if [ -z "$TRACK" ] ; then
-  metaflac --export-tags-to=- "$FLAC" | egrep '^TITLE=' | sed s/TITLE=// | awk '{ printf "%2d %s\n", NR, $0; }'
+  metaflac --export-tags-to=- "$FLAC" | egrep '^TITLE' | cut -d= -f2 | awk '{ printf "%2d %s\n", NR, $0; }'
   exit 0
 fi
 
-ARTIST=`metaflac --export-tags-to=- "$FLAC" | egrep '^ARTIST=' | sed s/ARTIST=//`
-TITLE=`metaflac --export-tags-to=- "$FLAC" | egrep '^TITLE=' | sed s/TITLE=// | head -n $TRACK | tail -n 1`
+ARTIST=`metaflac --export-tags-to=- "$FLAC" | egrep '^ARTIST' | cut -d= -f2`
+TITLE=`metaflac --export-tags-to=- "$FLAC" | egrep '^TITLE' | cut -d= -f2 | head -n $TRACK | tail -n 1`
 FNAME="$ARTIST - $TITLE.wav"
 
 flac -d --cue=$TRACK.1-$((TRACK + 1)).1 -o "$FNAME" "$FLAC"
