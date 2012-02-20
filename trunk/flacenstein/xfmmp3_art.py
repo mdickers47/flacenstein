@@ -15,7 +15,7 @@ import sys
 import flaclib
 import flaccfg
 
-description = "Encode to MP3 with cover art"
+description = "MP3 with cover art"
 status = "init"
 notify = lambda s: sys.stdout.write(s + '\n')
 outpath = "/tmp/flac"
@@ -54,10 +54,10 @@ def encodeFile(job):
             (job.artist, job.title)
     tag = pyid3lib.tag(job.outfile)
     # No idea wtf type has ended up in these strings, but pyid3lib craps out
-    # without the str().  Probably has to do with more unicode bullshit.
-    tag.artist = str(job.artist)
-    tag.album = str(job.album)
-    tag.title = str(job.title)
+    # without the encode(), because of more unicode bullshit.
+    tag.artist = job.artist.encode('iso-8859-15')
+    tag.album = job.album.encode('iso-8859-15')
+    tag.title = job.title.encode('iso-8859-15')
     tag.track = job.tracknum
     if job.coverart:
         # following example at: http://pyid3lib.sourceforge.net/doc.html
