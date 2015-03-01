@@ -7,10 +7,10 @@ http://www.rarewares.org/.
 """
 
 import os
-import re
 import sys
 
 import flaclib
+import flaccfg
 
 # The following are required for all transform modules, and will be
 # used by Flacenstein.
@@ -27,19 +27,14 @@ def ready():
     The ready() method checks that all the binaries this module requires
     can be executed, and returns True if they can.
     """
-    out = os.popen4("faac", "r")[1]
-    s = out.read()
-    out.close()
-    if not re.compile("FAAC [0-9\.]+").search(s):
-        _setstatus("Can't execute faac program.")
-        return False
-    out = os.popen4("flac -v", "r")[1]
-    s = out.read()
-    out.close()
-    if not re.compile("flac [0-9\.]+").search(s):
-        _setstatus("Can't execute flac program.")
-        return False
-    return True
+    ok = True
+    ok &= flaclib.check_binary(['faac'], 
+                               r'FAAC [0-9\.]+',
+                               loud=True)
+    ok &= flaclib.check_binary([flaccfg.BIN_FLAC, '-v'],
+                               r'flac [0-9\.]+',
+                               loud=True)
+    return ok
 
 def encodeFile(job):
 

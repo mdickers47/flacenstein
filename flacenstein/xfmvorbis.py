@@ -9,6 +9,7 @@ import os
 import re
 import sys
 
+import flaccfg
 import flaclib
 
 description = "Encode to Ogg Vorbis"
@@ -18,15 +19,16 @@ outpath = "/tmp/flac"
 extension = "ogg"
 debug = True
 
-BIN_OGG = "oggenc"
-BIN_FLAC = "flac"
-
 def ready():
     """Check whether binaries we need can be executed."""
-    status = True
-    status &= _check_binary("%s -h" % BIN_OGG, "Usage: oggenc")
-    status &= _check_binary("%s -v" % BIN_FLAC, "flac ([0-9\.]+)")
-    return status
+    ok = True
+    ok &= flaclib.check_binary([flaccfg.BIN_OGG, '-h'],
+                               'Usage: oggenc',
+                               loud=True)
+    ok &= flaclib.check_binary([flaccfg.BIN_FLAC, '-v'],
+                               r'flac ([0-9\.]+)',
+                               loud=True)
+    return ok
 
 def encodeFile(job):
     
