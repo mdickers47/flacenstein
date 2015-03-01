@@ -27,10 +27,12 @@ def ready():
     Check whether binaries we need can be executed.
     """
     ok = True
-    ok &= flaclib.check_binary("%s --version" % flaccfg.BIN_LAME,
-                               "LAME (\d\dbits )?version ([0-9\.]+)")
-    ok &= flaclib.check_binary("%s -v" % flaccfg.BIN_FLAC, 
-                               "flac ([0-9\.]+)")
+    ok &= flaclib.check_binary([flaccfg.BIN_LAME, "--version"], 
+                               "LAME (\d\dbits )?version ([0-9\.]+)",
+                               loud=True)
+    ok &= flaclib.check_binary([flaccfg.BIN_FLAC, "-v"],
+                               "flac ([0-9\.]+)",
+                               loud=True)
     return ok
 
 def encodeFile(job):

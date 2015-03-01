@@ -10,8 +10,11 @@ import os
 import pickle
 import re
 import stat
+import subprocess
 import sys
 import tempfile
+
+import flaccfg
 
 CD_SAMPLES_PER_FRAME = 588 # 44100 samples/sec / 75 frames/sec
 
@@ -21,7 +24,7 @@ SIMPLE_TAGS = ['ARTIST', 'ALBUM', 'DATE', 'GENRE', 'ARCHIVE',
 class Error(Exception): pass
 class MetaflacFailed(Error): pass
 class BadMetadata(Error): pass
-
+class TrackNumOutOfRange(Error): pass
 
 class FlacFile:
     """
@@ -58,19 +61,20 @@ class FlacFile:
       if fname is not None and os.path.exists(fname): self.getMetadata()
 
     def _flac_cmd(self, flag, stdin=None):
-      cmd = 'metaflac --%s -- %s' % (flag, shellquote(self.filename))
+      cmd = [flaccfg.BIN_METAFLAC, '--%s' % flag, '--', self.filename]
       if stdin:
-        metaflac = os.popen(cmd, 'w')
-        metaflac.write(stdin)
         # metaflac tends to ignore the last line if it doesn't end with \n.
-        if not stdin.endswith('\n'): metaflac.write('\n')
-        out = None
+        if not stdin.endswith('\n'): stdin += '\n'
+        metaflac = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        stdout, stderr = metaflac.communicate(stdin)
       else:
-        metaflac = os.popen(cmd)
-        out = metaflac.read().split('\n')
-      ret = metaflac.close()
+        metaflac = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
+        stdout, stderr = metaflac.communicate()
+      metaflac.wait()
+      ret = metaflac.returncode
       if ret: raise MetaflacFailed('%s returned %s' % (cmd, ret))
-      return out
+      return stdout.split('\n')
 
     def getMetadata(self):
       for l in self._flac_cmd('list'):
@@ -95,13 +99,12 @@ class FlacFile:
           # save random crap we don't parse in self.tags
           else: self.tags[c] = arg
 
-      # Record mtime before we mess with the file, because sometimes we
-      # are going to want to set it back to what it was.
     def getFrames(self):
       return self.samples / CD_SAMPLES_PER_FRAME
 
     def saveTags(self, preserve_mtime=False):
-
+      # Record mtime before we mess with the file, because sometimes we
+      # are going to want to set it back to what it was.
       if preserve_mtime:
         st = os.stat(self.filename)
         utime = (st[stat.ST_ATIME], st[stat.ST_MTIME])
@@ -180,10 +183,27 @@ class FlacFile:
         os.chdir(path)
         fd, self.coverart = tempfile.mkstemp('.jpg', "thumb", path)
         os.close(fd) # Race condition, I know, big deal.
-        cmd = 'metaflac --export-picture-to=%s %s' % \
-            (self.coverart, shellquote(self.filename))
-        os.system(cmd)
+        # Watch out, untested!
+        self._flac_cmd('export-picture-to=%s' % self.coverart)
+        #cmd = 'metaflac --export-picture-to=%s %s' % \
+        #    (self.coverart, shellquote(self.filename))
+        #os.system(cmd)
         return self.coverart
+
+    def extractTrack(self, tracknum, outfile=None):
+      if tracknum >= len(self.tracks) or tracknum < 0:
+        print self.tracks
+        raise TrackNumOutOfRange
+      if not outfile:
+        outfile = filequote('%s - %s.wav' % (self.artist, self.tracks[tracknum]))
+      cmd = ['flac',
+             '-d',
+             '--cue=%d.1-%d.1' % (tracknum+1, tracknum+2),
+             '-o',
+             outfile,
+             self.filename]
+      subprocess.check_call(cmd)
+
     
 class FlacLibrary:
     """
@@ -221,11 +241,10 @@ class FlacLibrary:
                               len(self.flacs.keys()))
                 
     def _scanpath(self, path):
-      """
-      scanpath() is for the recursive use of scan(), and not really meant
-      to be called from the outside.
-      """
-      try:
+        """
+        scanpath() is for the recursive use of scan(), and not really meant
+        to be called from the outside.
+        """
         for f in os.listdir(path):
           fname = path.encode() + os.sep + f
           if os.path.isfile(fname) and f.endswith(".flac"):
@@ -233,7 +252,11 @@ class FlacLibrary:
             if count % 10 == 0:
               self.statusnotify("Searching %s (%d FLAC files found)" \
                                     % (path, count))
-            flac = FlacFile(fname)
+            try:
+              flac = FlacFile(fname)
+            except MetaflacFailed:
+              self.statusnotify("Invalid flac file: %s" % f)
+              continue
             if flac.md5:
               if self.flacs.has_key(flac.md5):
                 del self.flacs[flac.md5]
@@ -241,11 +264,9 @@ class FlacLibrary:
               self.flacs[flac.md5].verified = True
             else:
               self.statusnotify("Invalid flac file: %s" % f)
-          elif (os.path.isdir(fname) and not (fname.startswith("."))):
+          elif (os.path.isdir(fname) and not (f.startswith("."))):
             self._scanpath(fname)
-      except OSError:
-        return
-
+ 
 
 def shellquote(s):
     """
@@ -278,20 +299,30 @@ def filequote(s):
     s = s.replace('#', '_')
     return s
 
-def check_binary(cmd, regex):
+
+def check_binary(cmd, regex, loud=True):
     """
-    given a command and an expected output, tests whether the command can be
-    executed by e.g. os.system(), and whether the output matches the expected
-    regex.  For example, one might want to test whether 'gcc --version' can be
+    given a command and an expected output, tests whether the command
+    can be executed and whether the output matches the given regex.
+    For example, one might want to test whether 'gcc --version' can be
     executed and whether it returns 'gcc (GCC) 4\.\d+\.\d+'
     """
-    out = os.popen4(cmd, "r")[1]
-    s = out.read()
-    out.close()
-    m = re.findall(regex, s)
+    assert type(cmd) == type([])
+    try:
+      cmd = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+      out, err = cmd.communicate()
+      cmd.wait()
+    except OSError:
+      if loud: print 'Failed to execute %s' % cmd[0]
+      return False
+    m = re.findall(regex, out)
+    if not m and loud:
+        print 'Output from %s did not match %s' % (cmd[0], regex)
     # this looks useless, but we want to explicitly return a True or
     # False value so that operators like &= will work in calling code
     return not not m
+
 
 def flacpipe(f, n):
     """
@@ -322,6 +353,14 @@ def writeSavefile(f, flacs, rootpaths, outpath):
    pickle.dump(rootpaths, fd, pickle.HIGHEST_PROTOCOL)
    pickle.dump(outpath, fd, pickle.HIGHEST_PROTOCOL)
    fd.close()
+
+
+def testBinaries():
+    ok = True
+    ok &= check_binary(["flac"], "Command-line FLAC", loud=True)
+    ok &= check_binary(["metaflac"], "Command-line FLAC metadata editor",
+                       loud=True)
+    return ok
 
 
 if __name__ == '__main__':
