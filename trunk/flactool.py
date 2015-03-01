@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     library_path = flaccfg.DEFAULT_LIBRARY
     output_path = None
-    output_type = 'mp3_art'
+    output_type = 'mp3'
     lib = flaclib.FlacLibrary('')
     lib_dirty = False
 

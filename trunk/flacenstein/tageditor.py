@@ -2,6 +2,7 @@
 GUI form for editing tags in the Vorbis comment block.
 """
 import os
+import subprocess
 import wx
 
 import flaccfg
@@ -67,41 +68,22 @@ class frmTagEditor(wx.Frame):
         on it later.
         """
         self.lblFilename.SetLabel(os.path.basename(flac.filename))
-        # note that we just shell-quote the filename now, since that is how
-        # we are going to want it every time we ask for it
-        self.flacfile = flaclib.shellquote(flac.filename)
-        cmd = '%s --export-tags-to=- %s' % (flaccfg.BIN_METAFLAC, self.flacfile)
-        t = os.popen(cmd, 'r')
-        tags = unicode(t.read(), 'utf8')
+        # Beware, untested!
+        self.flacfile = flac.filename
+        cmd = [flaccfg.BIN_METAFLAC, '--export-tags-to=-', self.flacfile]
+        tags = unicode(subprocess.check_output(cmd), 'utf8')
         self.txtTags.SetValue(tags)
-        t.close()
         
-#         chain = metadata.Chain()
-#         chain.read(self.flacfile)
-#         it = metadata.Iterator()
-#         it.init(chain)
-#         vc = None
-#         tags = ''
-#         while True:
-#             if it.get_block_type == metadata.VORBIS_COMMENT:
-#                 vc = metadata.VorbisComment(it.get_block())
-#                 break
-#             if not it.next():
-#                 break
-#         if vc:
-#             for c in vc.comments:
-#                 tags += '%s=%s\n' % (c, vc.comments[c])
-#         self.txtTags.SetValue(tags)
-
     def OnSave(self, e):
         """
         Event handler for 'Save' button press.  Should write contents of text box to
         FLAC file, then destroy form.
         """
-        cmd = '%s --remove-all-tags %s' % (flaccfg.BIN_METAFLAC, self.flacfile)
-        os.system(cmd)
-        cmd = '%s --import-tags-from=- %s' % (flaccfg.BIN_METAFLAC, self.flacfile)
-        out = os.popen(cmd, 'w')
+        # Beware, untested!
+        cmd = [flaccfg.BIN_METAFLAC, '--remove-all-tags', self.flacfile]
+        subprocess.check_call(cmd)
+        cmd = [flaccfg.BIN_METAFLAC, '--import-tags-from=-', self.flacfile]
+        out = subprocess.Popen(cmd, stdin=subprocess.PIPE).stdin
         out.write(self.txtTags.GetValue().encode('utf8'))
         out.close()
         self.Destroy()
