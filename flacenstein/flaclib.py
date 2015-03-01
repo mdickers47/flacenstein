@@ -74,7 +74,8 @@ class FlacFile:
       metaflac.wait()
       ret = metaflac.returncode
       if ret: raise MetaflacFailed('%s returned %s' % (cmd, ret))
-      return stdout.split('\n')
+      if stdout: return stdout.split('\n')
+      return None
 
     def getMetadata(self):
       for l in self._flac_cmd('list'):
@@ -134,7 +135,8 @@ class FlacFile:
             if self.tags[name] ] # Drop tags with '' or None values
       for i in xrange(len(self.tracks)):
         t.append('TITLE[%d]=%s' % (i + 1, self.tracks[i]))
-      self._flac_cmd('remove-all-tags --import-tags-from=-',
+      self._flac_cmd('remove-all-tags')
+      self._flac_cmd('import-tags-from=-', 
                      stdin='\n'.join(t).encode('utf8'))
 
       if preserve_mtime: os.utime(self.filename, utime)
@@ -180,14 +182,9 @@ class FlacFile:
                 print "Can't create path %s" % path
                 return None
 
-        os.chdir(path)
         fd, self.coverart = tempfile.mkstemp('.jpg', "thumb", path)
         os.close(fd) # Race condition, I know, big deal.
-        # Watch out, untested!
         self._flac_cmd('export-picture-to=%s' % self.coverart)
-        #cmd = 'metaflac --export-picture-to=%s %s' % \
-        #    (self.coverart, shellquote(self.filename))
-        #os.system(cmd)
         return self.coverart
 
     def extractTrack(self, tracknum, outfile=None):
@@ -234,6 +231,8 @@ class FlacLibrary:
         # delete any entries that didn't turn up in the scan
         for k in self.flacs.keys():
             if not self.flacs[k].verified:
+                self.statusnotify("%s has disappeared" % \
+                                  self.flacs[k].filename)
                 del self.flacs[k]
             else:
                 del self.flacs[k].verified
@@ -248,18 +247,16 @@ class FlacLibrary:
         for f in os.listdir(path):
           fname = path.encode() + os.sep + f
           if os.path.isfile(fname) and f.endswith(".flac"):
-            count = len(self.flacs.keys())
-            if count % 10 == 0:
-              self.statusnotify("Searching %s (%d FLAC files found)" \
-                                    % (path, count))
             try:
               flac = FlacFile(fname)
             except MetaflacFailed:
               self.statusnotify("Invalid flac file: %s" % f)
               continue
             if flac.md5:
-              if self.flacs.has_key(flac.md5):
+              if flac.md5 in self.flacs:
                 del self.flacs[flac.md5]
+              else:
+                self.statusnotify("new: %s" % flac.filename)
               self.flacs[flac.md5] = flac
               self.flacs[flac.md5].verified = True
             else:
@@ -267,22 +264,6 @@ class FlacLibrary:
           elif (os.path.isdir(fname) and not (f.startswith("."))):
             self._scanpath(fname)
  
-
-def shellquote(s):
-    """
-    Makes an arbitrary string (hopefully) shell-safe to be given as an
-    argument: escapes ", $, and \ characters, then encloses the whole thing
-    in " characters.
-    """
-    ### testing: did I really not know that ' is different from "?
-    return "$'%s'" % s.replace("'", r"\'")
-    ###
-    if not s: return '""'
-    s = s.replace('\\', r'\\') # keep this first, or you will make $ into \\$
-    s = s.replace(r'"', r'\"')
-    s = s.replace(r'$', r'\$')
-    s = s.replace(r'&', r'\&')
-    return '"' + s + '"'
 
 def filequote(s):
     """
@@ -326,12 +307,18 @@ def check_binary(cmd, regex, loud=True):
 
 def flacpipe(f, n):
     """
-    Assembles a command line that will extract track n from file f
-    to standard output.
+    Returns a file descriptor that will give you the raw PCM data
+    after decoding track n from file f.
     """
-    cmd = "flac -s -d -c --cue=" + str(n) + ".1-" + str(n + 1) + ".1 "
-    cmd += shellquote(f)
-    return cmd
+    cmd = ['flac', '--silent', '--decode', '--stdout',
+           '--cue=%s.1-%s.1' % (n, n+1), f]
+    child = subprocess.Popen(cmd, bufsize=4096, stdout=subprocess.PIPE)
+    # Not sure it is safe to hang onto the stdout file descriptor and
+    # throw away the Popen object.  Could cause a zombie or Python
+    # memory leak.  But it is consisten with Popen examples in documentation.
+    # Doesn't really matter in the command line context where the parent
+    # process only lives a short time.
+    return child.stdout
 
 
 def loadSavefile(f):

@@ -7,6 +7,7 @@ http://www.rarewares.org/.
 """
 
 import os
+import subprocess
 import sys
 
 import flaclib
@@ -47,24 +48,20 @@ def encodeFile(job):
             print "Can't create path", outdir
             os._exit(1)
         
-    # prepare complicated pipeline command that will turn the flac track
-    # into an .m4a file
-    cmd = flaclib.flacpipe(job.flacfile, job.tracknum) + " | "
-    cmd += "faac -o "   + flaclib.shellquote(job.outfile)
-    cmd += " --artist " + flaclib.shellquote(job.artist)
-    cmd += " --album "  + flaclib.shellquote(job.album)
-    cmd += " --title "  + flaclib.shellquote(job.title)
-    cmd += " --track "  + str(job.tracknum)
-    if (job.coverart):
-        cmd += " --cover-art " + flaclib.shellquote(job.coverart)
-    cmd += " - " # 2>/dev/null"
-    #notify("Executing: %s" % cmd)
-    #os._exit(os.system(cmd))
-    print 'Executing: ', cmd
-    #os.execv('/bin/sh', ['-c', cmd])
-    ret = os.system(cmd)
-    sys.exit(ret)
-    # note we never return, we exit
+    # Beware, untested!
+    cmd = ['faac', '-o', job.outfile,
+           '--artist', job.artist,
+           '--album', job.album,
+           '--title', job.title,
+           '--track', str(job.tracknum)]
+    if job.coverart:
+        cmd.extend(['--cover-art', job.coverart])
+    cmd.append('-')
+    flac_stdout = flaclib.flacpipe(job.flacfile, job.tracknum)
+    faac_child = subprocess.Popen(cmd, stdin=flac_stdout)
+    flac_stdout.close()
+    faac_child.wait()
+    os._exit(faac_child.returncode)
 
 def cleanup():
     """We can at least try to clean up after ourselves, if the caller calls

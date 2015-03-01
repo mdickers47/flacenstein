@@ -7,6 +7,7 @@ Debian package is vorbis-tools.
 
 import os
 import re
+import subprocess
 import sys
 
 import flaccfg
@@ -41,15 +42,17 @@ def encodeFile(job):
             notify("Can't create path %s" % outdir)
             os._exit(1)
 
-    cmd = flaclib.flacpipe(job.flacfile, job.tracknum) + " | "
-    cmd += "oggenc -o " + flaclib.shellquote(job.outfile)
-    cmd += " -a " + flaclib.shellquote(job.artist)
-    cmd += " -l " + flaclib.shellquote(job.album)
-    cmd += " -t " + flaclib.shellquote(job.title)
-    cmd += " -N " + str(job.tracknum)
-    cmd += " -"
-    if debug: print "Executing:", cmd
-    os._exit(os.system(cmd))
+    cmd = [flaccfg.BIN_OGG, '-o', job.outfile,
+           '-a', job.artist,
+           '-l', job.album,
+           '-t', job.title,
+           '-N', str(job.tracknum),
+           '-']
+    flac_stdout = flaclib.flacpipe(job.flacfile, job.tracknum)
+    ogg_child = subprocess.Popen(cmd, stdin=flac_stdout)
+    flac_stdout.close()
+    ogg_child.wait()
+    os._exit(ogg_child.returncode)
 
 def cleanup():
     """this module doesn't use any temp files, so nothing to do here"""

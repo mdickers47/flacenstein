@@ -25,9 +25,9 @@ import fcntl
 import musicbrainz2.disc as mbdisc
 import musicbrainz2.webservice as mbws
 import os
-import popen2 # this will be better with subprocess in python 2.4
 import re
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -257,13 +257,14 @@ class frmRipper(wx.Frame):
         self-destructs if not.
         """
         msg = ''
-        if not flaclib.check_binary('%s -v' % flaccfg.BIN_FLAC, 'flac [\d\.]+'):
-            msg += 'Can\'t execute flac binary at %s\n' % flaccfg.BIN_FLAC
-        if not flaclib.check_binary('%s --version' % flaccfg.BIN_METAFLAC, 'metaflac [\d\.]+'):
-            msg += 'Can\'t execute metaflac binary at %s\n' % flaccfg.BIN_METAFLAC
-        if not flaclib.check_binary('%s -V' % flaccfg.BIN_CDPARANOIA, \
+        if not flaclib.check_binary([flaccfg.BIN_FLAC, '-v'], 'flac [\d\.]+'):
+            msg += "Can't execute flac binary at %s\n" % flaccfg.BIN_FLAC
+        if not flaclib.check_binary([flaccfg.BIN_METAFLAC, '--version'],
+                                    'metaflac [\d\.]+'):
+            msg += "Can't execute metaflac binary at %s\n" % flaccfg.BIN_METAFLAC
+        if not flaclib.check_binary([flaccfg.BIN_CDPARANOIA, '-V'], 
                                     'cdparanoia III release [\d\.]+'):
-            msg += 'Can\'t execute cdparanoia binary at %s\n' % flaccfg.BIN_CDPARANOIA
+            msg += "Can't execute cdparanoia binary at %s\n" % flaccfg.BIN_CDPARANOIA
             
         if msg:
             m = wx.MessageDialog(self, msg, \
@@ -455,17 +456,18 @@ class frmRipper(wx.Frame):
         self._create_cue()
         
         # popen the cdparanoia process and set non-blocking reads on its output
-        cmd = '%s -e' % flaccfg.BIN_CDPARANOIA
-        if self.cddevice:
-            cmd += '-d %s' % self.cddevice
-        cmd += ' 1-'
+        cmd = [flaccfg.BIN_CDPARANOIA, '-e']
+        if self.cddevice: cmd.extend(['-d', self.cddevice])
         if TESTMODE:
-            cmd += '2' # rip only track 1 to save a lot of time
+            cmd.append('1-2')
             wx.LogMessage("TEST MODE active: Only ripping track 1!")
             wx.LogMessage("command is: %s" % cmd)
-            
-        self.child = popen2.Popen4(cmd)
-        fcntl.fcntl(self.child.fromchild.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+        else:
+            cmd.append('1-')
+
+        self.child = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                      stderr=subprocess.STDOUT)
+        fcntl.fcntl(self.child.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         self.childbuffer = ""
         wx.LogMessage("spawned cdparanoia process %d" % self.child.pid)
         self.setUIState(STATE_RIPPING)
@@ -506,17 +508,17 @@ class frmRipper(wx.Frame):
         self.updateProgress()
         ret = self.child.poll()
 
-        if ret == -1:
+        if ret == None:
             # child still running; just wait
             return
 
         # child exited: state change of some kind
         if self.state == STATE_RIPPING:
-            if os.WEXITSTATUS(ret) == 0:
+            if ret == 0:
                 # setting idle state sooner messes up lblProgress text
                 self.setUIState(STATE_IDLE) # or idle handler will puke exceptions
                 del self.child
-                del self.childbuffer
+                self.childbuffer = ""
 
                 wx.LogMessage("cdparanoia finished successfully")
                 
@@ -524,8 +526,8 @@ class frmRipper(wx.Frame):
                 # STATE_ENCODING
                 
                 if self.chkEject.GetValue():
-                    cmd = "eject"
-                    if self.cddevice: cmd += " " + self.cddevice
+                    cmd = ['eject']
+                    if self.cddevice: cmd.append(self.cddevice)
                     self.runCommand(cmd)
                         
                 t = self.txtTags.GetValue()
@@ -543,35 +545,31 @@ class frmRipper(wx.Frame):
                 self.outfile = os.path.join(self.txtOutPath.GetValue(), f)
 
                 self.goToWorkDir()
-                cmd = "%s -o %s --delete-input-file -V " \
-                      % (flaccfg.BIN_FLAC, flaclib.shellquote(self.outfile))
-                cmd += " --padding 262144 cdda.wav"
-                wx.LogMessage(cmd)
-                self.child = popen2.Popen4(cmd)
-                self.childbuffer = ""
-                fcntl.fcntl(self.child.fromchild.fileno(), fcntl.F_SETFL,
-                            os.O_NONBLOCK)
+                cmd = [flaccfg.BIN_FLAC, '-o', self.outfile,
+                       '--delete-input-file', '-V', '--padding', '262144',
+                       'cdda.wav']
+                self.child = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                              stderr=subprocess.STDOUT)
                 wx.LogMessage("spawned flac process %d" % self.child.pid)
                 self.setUIState(STATE_ENCODING)
                 
             else:
                 self.setUIState(STATE_IDLE)
                 del self.child
-                del self.childbuffer
-                wx.LogMessage("cdparanoia exited with status %d" \
-                              % os.WEXITSTATUS(ret))
+                self.childbuffer = ""
+                wx.LogMessage("cdparanoia exited with status %s" % ret)
                 wx.LogMessage("Not cleaning up work directory %s" \
                               % self.workdir)
                 
         elif self.state == STATE_ENCODING:
             self.setUIState(STATE_IDLE)
             del self.child
-            del self.childbuffer                
-            if os.WEXITSTATUS(ret) == 0:
+            self.childbuffer = ""
+
+            if ret == 0:
                 wx.LogMessage("encoder finished successfully")
             else:
-                wx.LogError("encoder exited with status %d"
-                            % os.WEXITSTATUS(ret))
+                wx.LogError("encoder exited with status %s" % ret)
                 
             # use metaflac to load tags from text box.  We could have done
             # this with many -T arguments to flac, but then we would not
@@ -579,20 +577,18 @@ class frmRipper(wx.Frame):
             wx.LogMessage("inserting tags")
             self.goToWorkDir()
             open("tags", "w").write(self.txtTags.GetValue().encode('utf8'))
-            cmd = "%s --import-tags-from=tags " % flaccfg.BIN_METAFLAC
-            cmd += flaclib.shellquote(self.outfile)
-            self.runCommand(cmd)
-                
-            cmd = '%s --import-cuesheet-from=cue ' % flaccfg.BIN_METAFLAC
-            cmd += flaclib.shellquote(self.outfile)
-            self.runCommand(cmd)
+            self.runCommand([flaccfg.BIN_METAFLAC, '--import-tags-from=tags',
+                             self.outfile])
 
-            # use flacimage to insert image files
-            wx.LogMessage("inserting cover art image")
-            cmd = '%s --import-picture-from ' % flaccfg.BIN_METAFLAC
-            cmd += flaclib.shellquote(self.coverart)
-            cmd += " " + flaclib.shellquote(self.outfile)
-            self.runCommand(cmd)
+            wx.LogMessage("inserting cuesheet")    
+            self.runCommand([flaccfg.BIN_METAFLAC, '--import-cuesheet-from=cue',
+                             self.outfile])
+
+            if self.coverart:
+                wx.LogMessage("inserting cover art image")
+                self.runCommand([flaccfg.BIN_METAFLAC, '--import-picture-from',
+                                 self.coverart, self.outfile])
+
             del self.outfile
             if not TESTMODE: self.cleanUpWorkDir()
 
@@ -651,7 +647,7 @@ class frmRipper(wx.Frame):
         
     def updateProgress(self):
         try:
-            s = self.child.fromchild.read()
+            s = self.child.stdout.read()
             self.childbuffer += s
         except IOError:
             return
@@ -740,13 +736,13 @@ class frmRipper(wx.Frame):
         return
 
     def runCommand(self, cmd):
-        ret = os.system(cmd)
+        assert type(cmd) == type([])
+        ret = subprocess.call(cmd)
         if TESTMODE:
             wx.LogMessage("running external command: %s" % cmd)
-        if os.WEXITSTATUS(ret):
-            wx.LogError("system command returned status %d" \
-                        % os.WEXITSTATUS(ret))
-            wx.LogError("failed command was: %s" % cmd)
+        if ret:
+            wx.LogError("system command returned status %s" % ret)
+            wx.LogError("failed command's argv was: %s" % cmd)
         return ret == 0
 
     def setCoverArt(self, path):
