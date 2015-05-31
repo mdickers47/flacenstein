@@ -8,7 +8,7 @@ are permitted under the terms of the GNU General Public License, version 2.
 """
 
 import wxversion
-wxversion.select('2.8')
+wxversion.select('3.0')
 
 import os
 import sys
