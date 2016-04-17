@@ -6,6 +6,8 @@
 # Copyright 2008 Michael A. Dickerson.  Permission to use, modify
 # and redistribute granted under the terms of the GNU GPL v2.
 
+set -e
+
 while getopts e F ; do
   case $F in
   e) EDIT=1 ;;
@@ -18,7 +20,7 @@ MD5=`which md5sum || which md5`
 
 for F in "$@" ; do
   if [ -n "$EDIT" ]; then
-    TMP=`mktemp -t tags.`
+    TMP=`mktemp -t tags.XXXXXX`
     metaflac --export-tags-to=$TMP "$F"
     PRE_MD5=`$MD5 $TMP`
     ${EDITOR:-vi} $TMP || exit $?
