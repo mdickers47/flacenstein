@@ -32,6 +32,7 @@ BIN_METAFLAC = 'metaflac'
 BIN_LAME = 'lame'
 BIN_CDPARANOIA = 'cdparanoia'
 BIN_OGG = 'oggenc'
+BIN_OPUS = 'opusenc'
 
 # there should be a python module 'xfm%s.py' for each entry here
-XFM_MODS = ('aac', 'vorbis', 'mp3')
+XFM_MODS = ('aac', 'vorbis', 'mp3', 'opus')
