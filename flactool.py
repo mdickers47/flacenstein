@@ -166,7 +166,6 @@ if __name__ == '__main__':
           for n, t in enumerate(f.tracks):
               print 'Track %d: %s' % (n+1, t)
 
-
     elif verb == 'convert':
 
         to_convert = parse_flac_args(lib, args[1:])
@@ -191,7 +190,10 @@ if __name__ == '__main__':
                 j.album = f.album
                 j.tracknum = c
                 j.flacfile = f.filename
-                j.coverart = f.extractThumbnail(artdir)
+                try:
+                    j.coverart = f.extractThumbnail(artdir)
+                except flaclib.MetaflacFailed:
+                    j.coverart = None
                 # j.listindex = f.listindex
                 fname = '%02d - %s.%s' % (c, t, xfmmod.extension)
                 j.outfile = os.path.join(output_path,
@@ -204,6 +206,7 @@ if __name__ == '__main__':
         print 'Prepared %d jobs' % len(jobs)
         while jobs:
             j = jobs.pop()
+            print j.outfile
             child = os.fork()
             if child == 0:
                 # encodeFile() is expected to exec an encoder process and

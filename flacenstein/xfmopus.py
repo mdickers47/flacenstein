@@ -41,6 +41,7 @@ def encodeFile(job):
             os._exit(1)
 
     cmd = ['opusenc', # accept default bitrate of 96kbps per stereo pair
+           '--quiet',
            '--artist', job.artist,
            '--album', job.album,
            '--title', job.title,
