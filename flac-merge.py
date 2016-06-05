@@ -1,18 +1,33 @@
 #!/usr/bin/python
-"""
-flac-merge.py - Concatenate many flac files into one.
+"""Usage: flac-merge.py [-f listfile] [-o outfile] file1 file2 ...
 
-The specified files are combined in the order given on the command
-line.  The output flac file is tagged with the first artist that was
-found, the first album, and one TITLE tag from each input file.  A
-cuesheet is constructed, where each input file is marked as one track.
+-f: Read file names from lines in listfile.  Reads file names from
+    stdin if listfile is -.
+
+-o: Write output file to outfile.  Otherwise, output file name will be
+    guessed from input file tags.
+
+Concatenates audio files into one long flac file, mapped with a
+CUESHEET metadata block.  Each input file can be flac or wav.
+
+The VORBIS_COMMENTS metadata block of the output file is tagged with
+the first artist that was found, the first album, and one TITLE tag
+from each input file.  A CUESHEET metadata block is constructed that
+maps each input file as one track.
+
+The output stream contains any zero-byte padding necessary to align
+track boundaries with CD frame boundaries, so the finished
+stream/cuesheet combination can be burned as a working audio CD.
 
 This mostly makes sense if the input files are tracks from the same
-album.  Or if they're not, but you want to make them into an "album."
+album.  Or if they're not, but you want to assemble them into an
+"album."
 
 Copyright 2008 Mikey Dickerson <mikey@singingtree.com>
+
 """
 
+import getopt
 import os
 import subprocess
 import sys
@@ -65,7 +80,25 @@ def _check_metadata(outflac, channels, depth, sample_rate):
 
 if __name__ == '__main__':
 
-  src_files = sys.argv[1:]
+  src_files = []
+  outfile = None
+
+  try:
+    opts, args = getopt.getopt(sys.argv[1:], 'f:o:')
+  except getopt.GetoptError, e:
+    print str(e)
+    print __doc__
+    sys.exit(1)
+  for (opt, val) in opts:
+    if opt == '-f':
+      if val:
+        src_files.extend([x.strip() for x in sys.stdin.readlines()])
+      else:
+        src_files.extend([x.strip() for x in open(val, 'rb').readlines()])
+    elif opt == '-o':
+      outfile = val
+
+  src_files.extend(args)
   tracknum = pos = 0
   outflac = flaclib.FlacFile(None)
   cuesheet = ['FILE "dummy.wav" WAVE']
@@ -170,7 +203,7 @@ if __name__ == '__main__':
   # (end for f in src_files)
 
   out.close()
-  outflac.filename = outflac.suggestFilename()
+  outflac.filename = outfile or outflac.suggestFilename()
   assert not os.path.exists(outflac.filename)
   print 'Compressing output to %s' % outflac.filename
   cmd = ['flac', '-o', outflac.filename, 'combined.wav']
