@@ -7,7 +7,8 @@ Usage: flactool.py [-t output_type] [-o output_path] [-l library_path]
                      convert flac1 flac2 ... |
                      search flac1 flac2 ... |
                      info flac1 flac2 ... |
-                     extract flac1 tracknum )
+                     extract flac1 tracknum |
+                     latest n )
 
 See output of 'flactool check' for possible output types.
 
@@ -154,6 +155,20 @@ if __name__ == '__main__':
               (args[1], len(flacs))
           sys.exit(1)
         flacs[0].extractTrack(tracknum)
+
+    elif verb == 'latest':
+
+        n = 10
+        if len(args) > 1:
+            try:
+                n = int(args[1])
+            except ValueError:
+                usage()
+
+        flacs = lib.flacs.values()
+        flacs.sort(key=lambda f: f.mtime, reverse=True)
+        for f in flacs[:n]:
+            print f.filename
 
     elif verb == 'info':
 

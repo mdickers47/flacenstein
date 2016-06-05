@@ -99,6 +99,7 @@ class FlacFile:
           elif c == 'TRACKNUM': self.tags[c] = int(arg)
           # save random crap we don't parse in self.tags
           else: self.tags[c] = arg
+      self.mtime = os.stat(self.filename)[stat.ST_MTIME]
 
     def getFrames(self):
       return self.samples / CD_SAMPLES_PER_FRAME
