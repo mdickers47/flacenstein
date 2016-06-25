@@ -15,8 +15,8 @@ done
 shift $(($OPTIND - 1))
 
 ME=`basename $0`
-AUDIO=`mktemp -t $ME`
-CUE=`mktemp -t $ME`
+AUDIO=`mktemp -t $ME.XXXXX.wav`
+CUE=`mktemp -t $ME.XXXXX.cue`
 FLAC=$1
 
 echo FILE "$AUDIO" WAVE > $CUE
