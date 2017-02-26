@@ -1,26 +1,52 @@
 #!/usr/bin/python
-"""
-Usage: flactool.py [-t output_type] [-o output_path] [-l library_path]
-                   ( check | 
-                     init path1 path2 ... |
-                     scan |
-                     convert flac1 flac2 ... |
-                     search flac1 flac2 ... |
-                     info flac1 flac2 ... |
-                     extract flac1 tracknum |
-                     latest n )
+"""Usage: flactool.py [-options] verb [args]
 
-See output of 'flactool check' for possible output types.
+Options apply to multiple verbs:
 
-Use 'flactool init /path/to/flacs' to create a new library file in the
-default location.  Use 'flactool scan' to update the library when
-files are added or deleted.
+-t abc  - Set output type (see 'check' below).
+-o path - Set output file path.
+-l lib  - Use lib instead of default library file.
+-0      - Write output to stdout with null delimiters.
 
-Any argument specifying a flac file name may be either an explicit path
-name, or a regex that will be matched against filenames, artists, and
-album names in the whole library.
+There must be exactly one verb, which may have arguments:
 
-Copyright 2009 Michael A. Dickerson.  Modification and redistribution
+init path1 path2 ...
+  Create new library file with one or more root paths.
+
+check
+  Print configuration and self-tests.  Transcoder modules that report
+  "ready" can be used as an argument to -t.
+
+scan
+  Search filesystem and update library index with any new, changed, or
+  deleted flac files.
+
+search flacarg1 flacarg2 ...
+  Print absolute paths of selected flac files.  With -0, you can pipe
+  the output to e.g. "xargs -0 -n 1 mplayer"
+
+info flacarg1 flacarg2 ...
+  Print metadata tags for selected flac files.
+
+extract flacarg1 tracknum
+  Extract given track from flac file to a wav file in current
+  directory.
+
+latest n
+  Print absolute paths of the n files with the most recent modification
+  times.
+
+convert flacarg1 flacarg2 ...
+  Transcode selected flac files.  Output type and path are controlled
+  by -t and -o.  The last-used values are remembered if not specified.
+  Any file that already exists at a desired output path will not be
+  overwritten.
+
+Any flacarg may be either a resolvable file name, or a regex that will
+be matched against filenames, artists, and album tags in the entire
+library.
+
+Copyright 2009-2017 Mikey Dickerson.  Modification and redistribution
 are permitted under the terms of the GNU General Public License,
 version 2.
 """
@@ -65,16 +91,24 @@ def parse_flac_args(lib, args):
             flacs.append(flac)
     return flacs
 
+def print_stdout(what, null_delimiter=False):
+  if null_delimiter:
+    sys.stdout.write(what)
+    sys.stdout.write('\0')
+  else:
+    print what
+
 if __name__ == '__main__':
 
   library_path = flaccfg.DEFAULT_LIBRARY
   output_path = None
   output_type = 'mp3'
+  print_nulls = False
   lib = flaclib.FlacLibrary('')
   lib_dirty = False
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:], 't:o:l:')
+    opts, args = getopt.getopt(sys.argv[1:], 't:o:l:0')
   except getopt.GetoptError, e:
     print str(e)
     usage()
@@ -85,6 +119,8 @@ if __name__ == '__main__':
       output_path = val
     elif opt == '-l':
       library_path = val
+    elif opt == '-0':
+      print_nulls = True
     else:
       assert False, 'unpossible!'
   if len(args) < 1: usage()
@@ -142,7 +178,7 @@ if __name__ == '__main__':
   elif verb == 'search':
 
     flacs = parse_flac_args(lib, args[1:])
-    for f in flacs: print f.filename
+    for f in flacs: print_stdout(f.filename, print_nulls)
 
   elif verb == 'extract':
 
@@ -166,7 +202,7 @@ if __name__ == '__main__':
 
     flacs = lib.flacs.values()
     flacs.sort(key=lambda f: f.mtime, reverse=True)
-    for f in flacs[:n]: print f.filename
+    for f in flacs[:n]: print_stdout(f.filename, print_nulls)
 
   elif verb == 'info':
 
