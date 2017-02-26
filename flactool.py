@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """Usage: flactool.py [-options] verb [args]
 
 Options apply to multiple verbs:
