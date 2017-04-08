@@ -185,7 +185,13 @@ class FlacFile:
 
         fd, self.coverart = tempfile.mkstemp('.jpg', "thumb", path)
         os.close(fd) # Race condition, I know, big deal.
-        self._flac_cmd('export-picture-to=%s' % self.coverart)
+        
+        try:
+            self._flac_cmd('export-picture-to=%s' % self.coverart)
+        except MetaflacFailed:
+            os.unlink(self.coverart)
+            self.coverart = None
+            
         return self.coverart
 
     def extractTrack(self, tracknum, outfile=None):
