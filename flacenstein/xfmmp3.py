@@ -42,7 +42,7 @@ def encodeFile(job):
             notify("Can't create path %s" % outdir)
             os._exit(1)
 
-    cmd = [flaccfg.BIN_LAME, '--preset', 'standard',
+    cmd = [flaccfg.BIN_LAME, '--preset', 'medium',
            '--ta', job.artist,
            '--tl', job.album,
            '--tt', job.title,
