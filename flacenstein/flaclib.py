@@ -275,7 +275,7 @@ class FlacLibrary:
 def filequote(s):
     """
     Deletes or substitutes the characters that are likely to cause
-    non-portable filenames: anything Unicode, and (? * : / \ #).
+    non-portable filenames: anything Unicode, and (?*:/\#!"'<>).
     """
     if not s: return '""'
     s = s.encode('ascii', 'replace')
@@ -286,6 +286,7 @@ def filequote(s):
     s = s.replace('\\', '-')
     s = s.replace('#', '_')
     s = s.replace('"', '')
+    s = s.replace("'", '')
     s = s.replace('!', '')
     s = s.replace('>', '')
     s = s.replace('<', '')
