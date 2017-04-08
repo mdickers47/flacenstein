@@ -238,12 +238,8 @@ if __name__ == '__main__':
         j.album = f.album
         j.tracknum = c
         j.flacfile = f.filename
-        try:
-          j.coverart = f.extractThumbnail(artdir)
-        except flaclib.MetaflacFailed:
-          j.coverart = None
-        # j.listindex = f.listindex
-        fname = '%02d - %s.%s' % (c, t, xfmmod.extension)
+        j.coverart = f.extractThumbnail(artdir)
+        fname = '%02d %s.%s' % (c, t, xfmmod.extension)
         j.outfile = os.path.join(output_path,
                                  flaclib.filequote(f.artist),
                                  flaclib.filequote(f.album),
