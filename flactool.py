@@ -82,14 +82,13 @@ def parse_flac_args(lib, args):
     if os.path.isfile(arg):
       flacs.append(flaclib.FlacFile(arg))
     else:
-      regex = re.compile(arg)
+      regex = re.compile(arg, re.IGNORECASE)
       for flac in lib.flacs.values():
         if (regex.search(flac.filename) or
             regex.search(flac.artist or "") or
             regex.search(flac.album or "")):
-            #print 'regex %s selected %s' % (arg, flac.filename)
             flacs.append(flac)
-    return flacs
+  return flacs
 
 def print_stdout(what, null_delimiter=False):
   if null_delimiter:
@@ -139,6 +138,7 @@ if __name__ == '__main__':
     output_path = saved_path
 
   verb = args[0]
+
   if verb == 'check':
 
     print 'Library %s contains %s files' % (library_path, len(lib.flacs))
