@@ -215,10 +215,11 @@ class FlacLibrary:
     dictionary mapping md5 keys to FlacFile class instances.
     """
     
-    def __init__(self, startpath):
-        self.rootpaths = [startpath]
+    def __init__(self, rootpaths):
+        assert type(rootpaths) == type([]) # look out for strings
+        self.rootpaths = rootpaths[:]
         self.flacs = { }
-        self.statusnotify = lambda s: sys.stdout.write(s + '\n')
+        self.stdout = sys.stdout
         
     def addpath(self, newpath):
         self.rootpaths.append(newpath)
@@ -230,21 +231,20 @@ class FlacLibrary:
         # clear a flag in each flac entry, so that we can iterate them
         # after we are done scanning and identify any that were not
         # hit (mark and sweep)
-        for flac in self.flacs.values():
-            flac.verified = False
+        for flac in self.flacs.values(): flac.verified = False
         # scan each of our possibly many root paths
         for path in self.rootpaths:
             self._scanpath(path)
         # delete any entries that didn't turn up in the scan
         for k in self.flacs.keys():
             if not self.flacs[k].verified:
-                self.statusnotify("%s has disappeared" % \
+                self.stdout.write("%s has disappeared\n" % \
                                   self.flacs[k].filename)
                 del self.flacs[k]
             else:
                 del self.flacs[k].verified
-        self.statusnotify("Done (%d FLAC files found)." % \
-                              len(self.flacs.keys()))
+        self.stdout.write("Done (%d FLAC files found).\n" % \
+                          len(self.flacs.keys()))
                 
     def _scanpath(self, path):
         """
@@ -257,17 +257,17 @@ class FlacLibrary:
             try:
               flac = FlacFile(fname)
             except MetaflacFailed:
-              self.statusnotify("Invalid flac file: %s" % f)
+              self.stdout.write("invalid flac file: %s\n" % f)
               continue
             if flac.md5:
               if flac.md5 in self.flacs:
                 del self.flacs[flac.md5]
               else:
-                self.statusnotify("new: %s" % flac.filename)
+                self.stdout.write("new: %s\n" % flac.filename)
               self.flacs[flac.md5] = flac
               self.flacs[flac.md5].verified = True
             else:
-              self.statusnotify("Invalid flac file: %s" % f)
+              self.stdout.write("invalid flac file: %s\n" % f)
           elif (os.path.isdir(fname) and not (f.startswith("."))):
             self._scanpath(fname)
  
@@ -340,17 +340,15 @@ def loadSavefile(f):
     """
     fd = open(os.path.expanduser(f), 'r')
     flacs = pickle.load(fd)
-    rootpaths = pickle.load(fd)
-    outpath = pickle.load(fd)
-    return flacs, rootpaths, outpath
+    prefs = pickle.load(fd)
+    return flacs, prefs
 
 
-def writeSavefile(f, flacs, rootpaths, outpath):
+def writeSavefile(f, flacs, prefs):
    """see loadSavefile()."""
    fd = open(os.path.expanduser(f), 'w')
    pickle.dump(flacs, fd, pickle.HIGHEST_PROTOCOL)
-   pickle.dump(rootpaths, fd, pickle.HIGHEST_PROTOCOL)
-   pickle.dump(outpath, fd, pickle.HIGHEST_PROTOCOL)
+   pickle.dump(prefs, fd, pickle.HIGHEST_PROTOCOL)
    fd.close()
 
 

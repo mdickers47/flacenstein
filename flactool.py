@@ -99,53 +99,50 @@ def print_stdout(what, null_delimiter=False):
 
 if __name__ == '__main__':
 
-  library_path = flaccfg.DEFAULT_LIBRARY
-  output_path = None
-  output_type = 'mp3'
+  library_file = flaccfg.DEFAULT_LIBRARY
   print_nulls = False
-  lib = flaclib.FlacLibrary('')
-  lib_dirty = False
+  lib = flaclib.FlacLibrary([])
+  prefs = {}
+  state_dirty = False
 
   try:
     opts, args = getopt.getopt(sys.argv[1:], 't:o:l:0')
+    opts = dict(opts)
   except getopt.GetoptError, e:
-    print str(e)
+    sys.stderr.write(str(e) + '\n')
     usage()
-  for (opt, val) in opts:
-    if opt == '-t':
-      output_type = val
-    elif opt == '-o':
-      output_path = val
-    elif opt == '-l':
-      library_path = val
-    elif opt == '-0':
-      print_nulls = True
-    else:
-      assert False, 'unpossible!'
-  if len(args) < 1: usage()
 
-  # Load library file, though we may not need it
+  # look for -l option first, then read preferences from it,
+  # then process other options.
+  if '-l' in opts: library_file = opts['-l']
+
   try:
-    lib.flacs, lib.rootpaths, saved_path = \
-    flaclib.loadSavefile(library_path)
+    lib, prefs = flaclib.loadSavefile(library_file)
   except (EOFError, IOError):
-    print 'Failed to load %s' % library_path
-    saved_path = None
+    sys.stderr.write('Failed to load %s\n' % library_file)
 
-  if output_path and output_path != saved_path:
-    lib_dirty = True
-  elif not output_path:
-    output_path = saved_path
+  if '-t' in opts:
+    prefs['output_type'] = opts['-t']
+    state_dirty = True
 
+  if '-o' in opts:
+    prefs['output_path'] = opts['-o']
+    state_dirty = True
+
+  if '-0' in opts:
+    print_nulls = True
+
+  if len(args) < 1: usage()
   verb = args[0]
 
   if verb == 'check':
 
-    print 'Library %s contains %s files' % (library_path, len(lib.flacs))
+    print 'Library %s contains %s files' % (library_file, len(lib.flacs))
     print 'Library root paths are: %s' % lib.rootpaths
-    print 'Last used output path is: %s' % output_path
+    print 'Last used output path is: %s' % prefs.get('output_path', '')
+    print 'Last used output type is: %s' % prefs.get('output_type', '')
     flaclib.testBinaries()
-    print 'Following are results from transcoder self-tests:'
+    print 'Transcoder self-tests:'
     for xfm in flaccfg.XFM_MODS:
       import_xfm(xfm)
       if xfmmod and xfmmod.ready():
@@ -155,14 +152,15 @@ if __name__ == '__main__':
 
   elif verb == 'init':
 
-    lib.rootpaths = args[1:]
+    # throw away the lib object we might already have
+    lib = flaclib.FlacLibrary(args[1:])
     lib.scan()
-    lib_dirty = True
+    state_dirty = True
 
   elif verb == 'scan':
 
     lib.scan()
-    lib_dirty = True
+    state_dirty = True
 
   elif verb == 'update_tags':
 
@@ -216,12 +214,16 @@ if __name__ == '__main__':
 
   elif verb == 'convert':
 
+    if not prefs['output_path'] and prefs['output_type']:
+      sys.stderr.write('must specifiy output path and type\n')
+      sys.exit(1)
+
     to_convert = parse_flac_args(lib, args[1:])
-    import_xfm(output_type)
+    import_xfm(prefs['output_type'])
     print 'output type is %s' % xfmmod.description
-    xfmmod.outpath = output_path
+    xfmmod.outpath = prefs['output_path']
     if not xfmmod.ready():
-      print '%s module fails self-tests.' % output_type
+      print '%s module fails self-tests.' % prefs['output_type']
       sys.exit(1)
 
     artdir = tempfile.mkdtemp('', 'flacart.')
@@ -229,18 +231,16 @@ if __name__ == '__main__':
     class EncodeJob: pass
 
     for f in to_convert:
-      c = 0
-      for t in f.tracks:
-        c += 1
+      for c, t in enumerate(f.tracks):
         j = EncodeJob()
+        j.tracknum = c + 1
         j.artist = f.artist
-        j.title = t or 'Track %d' % c
+        j.title = t or 'Track %d' % j.tracknum
         j.album = f.album
-        j.tracknum = c
         j.flacfile = f.filename
         j.coverart = f.extractThumbnail(artdir)
-        fname = '%02d %s.%s' % (c, t, xfmmod.extension)
-        j.outfile = os.path.join(output_path,
+        fname = '%02d %s.%s' % (j.tracknum, t, xfmmod.extension)
+        j.outfile = os.path.join(prefs['output_path'],
                                  flaclib.filequote(f.artist),
                                  flaclib.filequote(f.album),
                                  flaclib.filequote(fname))
@@ -269,7 +269,6 @@ if __name__ == '__main__':
   else:
     usage()
 
-  if lib_dirty:
-    flaclib.writeSavefile(library_path, lib.flacs, lib.rootpaths,
-                          output_path)
+  if state_dirty: flaclib.writeSavefile(library_file, lib, prefs)
+  sys.exit(0)
 
