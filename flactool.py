@@ -51,31 +51,34 @@ are permitted under the terms of the GNU General Public License,
 version 2.
 """
 
+import Queue
 import getopt
 import os
 import re
 import sys
 import tempfile
+import threading
 
 import flacenstein.flaclib as flaclib
 import flacenstein.flaccfg as flaccfg
 
-xfmmod = None
 
+class Error(Exception): pass
 
-def usage():
-  print __doc__
+def usage(msg=None):
+  if msg: sys.stderr.write(msg + '\n')
+  sys.stderr.write(__doc__ + '\n')
   sys.exit(1)
 
 
 def import_xfm(xfm):
-  global xfmmod
   try:
     xfmmod = __import__('flacenstein.xfm%s' % xfm, globals(),
                         locals(), 'xfm%s' % xfm)
   except ImportError:
     print '%s can\'t be imported' % xfm
     xfmmod = None
+  return xfmmod
 
 
 def parse_flac_args(lib, args):
@@ -102,6 +105,82 @@ def print_stdout(what, null_delimiter=False):
     print what
 
 
+class TranscodeWorker(threading.Thread):
+
+  def __init__(self, queue, xfmmod, myname):
+    threading.Thread.__init__(self)
+    self.queue = queue
+    self.xfmmod = xfmmod
+    self.myname = myname
+
+  def run(self):
+    while not self.queue.empty():
+      job = self.queue.get()
+      child = os.fork()
+      if child == 0:
+        # encodeFile() is expected to exec an encoder process and
+        # exit with a status code.
+        self.xfmmod.encodeFile(job)
+        assert False, 'Unpossible! encodeFile() returned!'
+
+      try:
+        os.waitpid(child, 0)
+      except KeyboardInterrupt:
+        print 'Killing child process %s' % child
+        os.kill(child, 15)
+        print 'See You Space Cowboy'
+        return
+
+      self.queue.task_done()
+      print 'worker %s finished %s' % (self.myname, job.outfile)
+
+
+def transcode_flacs(flaclist, prefs):
+
+  if not prefs['output_path'] and prefs['output_type']:
+    raise Error('must specify output path and type')
+
+  xfmmod = import_xfm(prefs['output_type'])
+  xfmmod.outpath = prefs['output_path']
+  if not xfmmod.ready():
+    raise Error('%s module failed self-tests' % prefs['output_type'])
+
+  print 'output type is %s' % xfmmod.description
+  artdir = tempfile.mkdtemp('', 'flacart.')
+  jobq = Queue.Queue()
+  class EncodeJob: pass
+
+  for f in flaclist:
+    for c, t in enumerate(f.tracks):
+      j = EncodeJob()
+      j.tracknum = c + 1
+      j.artist = f.artist
+      j.title = t or 'Track %d' % j.tracknum
+      j.album = f.album
+      j.flacfile = f.filename
+      j.coverart = f.extractThumbnail(artdir)
+      fname = '%02d %s.%s' % (j.tracknum, t, xfmmod.extension)
+      j.outfile = os.path.join(prefs['output_path'],
+                               flaclib.filequote(f.artist),
+                               flaclib.filequote(f.album),
+                               flaclib.filequote(fname))
+      j.failures = 0
+      if not os.path.isfile(j.outfile): jobq.put(j)
+
+  print 'Prepared %d jobs' % jobq.qsize()
+  bag_o_threads = set()
+  while len(bag_o_threads) < prefs.get('threads', 1):
+    t = TranscodeWorker(jobq, xfmmod, len(bag_o_threads))
+    t.start()
+    bag_o_threads.add(t)
+
+  # we wait for all the threads to exit, rather than wait for the
+  # queue to be empty, because the worker threads might crash.
+  while bag_o_threads:
+    t = bag_o_threads.pop()
+    t.join()
+
+
 if __name__ == '__main__':
 
   library_file = flaccfg.DEFAULT_LIBRARY
@@ -111,7 +190,7 @@ if __name__ == '__main__':
   state_dirty = False
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:], 't:o:l:0')
+    opts, args = getopt.getopt(sys.argv[1:], 't:o:l:0j:')
     opts = dict(opts)
   except getopt.GetoptError, e:
     sys.stderr.write(str(e) + '\n')
@@ -134,6 +213,13 @@ if __name__ == '__main__':
     prefs['output_path'] = opts['-o']
     state_dirty = True
 
+  if '-j' in opts:
+    try:
+      prefs['threads'] = int(opts['-j'])
+    except ValueError:
+      usage('non-integer argument for threads: %s' % opts['-j'])
+    state_dirty = True
+
   if '-0' in opts:
     print_nulls = True
 
@@ -149,11 +235,12 @@ if __name__ == '__main__':
     flaclib.testBinaries()
     print 'Transcoder self-tests:'
     for xfm in flaccfg.XFM_MODS:
-      import_xfm(xfm)
+      xfmmod = import_xfm(xfm)
       if xfmmod and xfmmod.ready():
         print '%s module is ready' % xfm
       else:
         print '%s failed self-tests and is disabled.' % xfm
+      del xfmmod
 
   elif verb == 'init':
 
@@ -219,58 +306,9 @@ if __name__ == '__main__':
 
   elif verb == 'convert':
 
-    if not prefs['output_path'] and prefs['output_type']:
-      sys.stderr.write('must specifiy output path and type\n')
-      sys.exit(1)
-
     to_convert = parse_flac_args(lib, args[1:])
-    import_xfm(prefs['output_type'])
-    print 'output type is %s' % xfmmod.description
-    xfmmod.outpath = prefs['output_path']
-    if not xfmmod.ready():
-      print '%s module fails self-tests.' % prefs['output_type']
-      sys.exit(1)
+    transcode_flacs(to_convert, prefs)
 
-    artdir = tempfile.mkdtemp('', 'flacart.')
-    jobs = []
-    class EncodeJob: pass
-
-    for f in to_convert:
-      for c, t in enumerate(f.tracks):
-        j = EncodeJob()
-        j.tracknum = c + 1
-        j.artist = f.artist
-        j.title = t or 'Track %d' % j.tracknum
-        j.album = f.album
-        j.flacfile = f.filename
-        j.coverart = f.extractThumbnail(artdir)
-        fname = '%02d %s.%s' % (j.tracknum, t, xfmmod.extension)
-        j.outfile = os.path.join(prefs['output_path'],
-                                 flaclib.filequote(f.artist),
-                                 flaclib.filequote(f.album),
-                                 flaclib.filequote(fname))
-        j.failures = 0
-        if not os.path.isfile(j.outfile): jobs.append(j)
-
-      print 'Prepared %d jobs' % len(jobs)
-      while jobs:
-        j = jobs.pop()
-        print j.outfile
-        child = os.fork()
-        if child == 0:
-          # encodeFile() is expected to exec an encoder process and
-          # exit with a status code.
-          xfmmod.encodeFile(j)
-          assert False, 'Unpossible! encodeFile() returned!'
-        try:
-          os.waitpid(child, 0)
-        except KeyboardInterrupt:
-          print 'Killing child process %s' % child
-          os.kill(child, 15)
-          print 'See You Space Cowboy'
-          break
-
-          if len(jobs) % 10 == 0: print '\n===> %d jobs to go\n' % len(jobs)
   else:
     usage()
 
