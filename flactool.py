@@ -62,9 +62,11 @@ import flacenstein.flaccfg as flaccfg
 
 xfmmod = None
 
+
 def usage():
   print __doc__
   sys.exit(1)
+
 
 def import_xfm(xfm):
   global xfmmod
@@ -74,6 +76,7 @@ def import_xfm(xfm):
   except ImportError:
     print '%s can\'t be imported' % xfm
     xfmmod = None
+
 
 def parse_flac_args(lib, args):
   assert type(args) == type([]) # watch out for strings!
@@ -90,12 +93,14 @@ def parse_flac_args(lib, args):
             flacs.append(flac)
   return flacs
 
+
 def print_stdout(what, null_delimiter=False):
   if null_delimiter:
     sys.stdout.write(what)
     sys.stdout.write('\0')
   else:
     print what
+
 
 if __name__ == '__main__':
 
