@@ -252,8 +252,8 @@ class FlacLibrary:
         to be called from the outside.
         """
         for f in os.listdir(path):
-          fname = path.encode() + os.sep + f
-          if os.path.isfile(fname) and f.endswith(".flac"):
+          fname = os.path.join(path, f)
+          if f.endswith('.flac') and os.path.isfile(fname):
             try:
               flac = FlacFile(fname)
             except MetaflacFailed:
@@ -327,7 +327,7 @@ def flacpipe(f, n):
     child = subprocess.Popen(cmd, bufsize=4096, stdout=subprocess.PIPE)
     # Not sure it is safe to hang onto the stdout file descriptor and
     # throw away the Popen object.  Could cause a zombie or Python
-    # memory leak.  But it is consisten with Popen examples in documentation.
+    # memory leak.  But it is consistent with Popen documentation.
     # Doesn't really matter in the command line context where the parent
     # process only lives a short time.
     return child.stdout
