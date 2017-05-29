@@ -54,6 +54,7 @@ version 2.
 import Queue
 import getopt
 import os
+import random
 import re
 import sys
 import tempfile
@@ -147,7 +148,7 @@ def transcode_flacs(flaclist, prefs):
 
   print 'output type is %s' % xfmmod.description
   artdir = tempfile.mkdtemp('', 'flacart.')
-  jobq = Queue.Queue()
+  joblist = []
   class EncodeJob: pass
 
   for f in flaclist:
@@ -165,9 +166,17 @@ def transcode_flacs(flaclist, prefs):
                                flaclib.filequote(f.album),
                                flaclib.filequote(fname))
       j.failures = 0
-      if not os.path.isfile(j.outfile): jobq.put(j)
+      if not os.path.isfile(j.outfile): joblist.append(j)
 
-  print 'Prepared %d jobs' % jobq.qsize()
+  num_threads = prefs.get('threads', 1)
+  print 'Prepared %d jobs' % len(joblist)
+  if num_threads > 3:
+    print 'Randomizing jobs to reduce I/O bottlenecks'
+    random.shuffle(joblist)
+
+  jobq = Queue.Queue()
+  while joblist: jobq.put(joblist.pop())
+
   bag_o_threads = set()
   while len(bag_o_threads) < prefs.get('threads', 1):
     t = TranscodeWorker(jobq, xfmmod, len(bag_o_threads))
