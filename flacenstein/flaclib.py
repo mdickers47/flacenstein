@@ -57,6 +57,7 @@ class FlacFile:
       self.samples = None
       self.sample_rate = None
       self.mtime = None
+      self.filesize = None
 
       if fname is not None and os.path.exists(fname): self.getMetadata()
 
@@ -99,7 +100,9 @@ class FlacFile:
           elif c == 'TRACKNUM': self.tags[c] = int(arg)
           # save random crap we don't parse in self.tags
           else: self.tags[c] = arg
-      self.mtime = os.stat(self.filename)[stat.ST_MTIME]
+      st = os.stat(self.filename)
+      self.mtime = st[stat.ST_MTIME]
+      self.filesize = st[stat.ST_SIZE]
 
     def getFrames(self):
       return self.samples / CD_SAMPLES_PER_FRAME
@@ -175,13 +178,12 @@ class FlacFile:
         if self.coverart and os.path.isfile(self.coverart):
             return self.coverart
         
-        # create the output path if it doesn't exist
-        if not os.path.isdir(path):
-            try:
-                os.makedirs(path)
-            except:
-                print "Can't create path %s" % path
-                return None
+        # create the output path if it doesn't exist.  Don't bother checking
+        # first because it's a race with other worker threads.
+        try:
+          os.makedirs(path)
+        except OSError, e:
+          pass
 
         fd, self.coverart = tempfile.mkstemp('.jpg', "thumb", path)
         os.close(fd) # Race condition, I know, big deal.
@@ -219,7 +221,6 @@ class FlacLibrary:
         assert type(rootpaths) == type([]) # look out for strings
         self.rootpaths = rootpaths[:]
         self.flacs = { }
-        self.stdout = sys.stdout
         
     def addpath(self, newpath):
         self.rootpaths.append(newpath)
@@ -227,50 +228,73 @@ class FlacLibrary:
     def clearpaths(self):
         self.rootpaths = []
         
-    def scan(self):
+    def scan(self, stdout=sys.stdout):
+        changed = False
+        fname_index = {}
         # clear a flag in each flac entry, so that we can iterate them
         # after we are done scanning and identify any that were not
         # hit (mark and sweep)
-        for flac in self.flacs.values(): flac.verified = False
+        for flac in self.flacs.values():
+          flac.verified = False
+          fname_index[flac.filename] = flac.md5
         # scan each of our possibly many root paths
         for path in self.rootpaths:
-            self._scanpath(path)
+            changed |= self._scanpath(path, stdout, fname_index)
         # delete any entries that didn't turn up in the scan
         for k in self.flacs.keys():
             if not self.flacs[k].verified:
-                self.stdout.write("%s has disappeared\n" % \
-                                  self.flacs[k].filename)
+                stdout.write('deleted: %s\n' % \
+                             self.flacs[k].filename)
                 del self.flacs[k]
+                changed = True
             else:
                 del self.flacs[k].verified
-        self.stdout.write("Done (%d FLAC files found).\n" % \
-                          len(self.flacs.keys()))
+        stdout.write('Done: %d FLAC files.' % len(self.flacs.keys()))
+        if not changed: stdout.write(' (No changes)')
+        stdout.write('\n')
+        return changed
                 
-    def _scanpath(self, path):
+    def _scanpath(self, path, stdout, fname_index):
         """
         scanpath() is for the recursive use of scan(), and not really meant
         to be called from the outside.
         """
-        for f in os.listdir(path):
+        changed = False
+        for f in sorted(os.listdir(path)):
           fname = os.path.join(path, f)
-          if f.endswith('.flac') and os.path.isfile(fname):
+
+          if f.endswith('.flac'):
+
+            # if the file name, size, and mtime all match the library
+            # image, skip inspecting the flac metadata which is expensive.
+            if fname in fname_index:
+              lib_image = self.flacs[fname_index[fname]]
+              st = os.stat(fname)
+              if (st[stat.ST_SIZE]  == lib_image.filesize and
+                  st[stat.ST_MTIME] == lib_image.mtime):
+                lib_image.verified = True
+                continue
+
+            # otherwise, read the embedded 'md5' metadata tag
             try:
               flac = FlacFile(fname)
+              if not flac.md5: raise MetaflacFailed('missing md5')
             except MetaflacFailed:
-              self.stdout.write("invalid flac file: %s\n" % f)
+              stdout.write('invalid: %s\n % f')
               continue
-            if flac.md5:
-              if flac.md5 in self.flacs:
-                del self.flacs[flac.md5]
-              else:
-                self.stdout.write("new: %s\n" % flac.filename)
-              self.flacs[flac.md5] = flac
-              self.flacs[flac.md5].verified = True
+            if flac.md5 in self.flacs:
+              del self.flacs[flac.md5]
+              stdout.write('changed: %s\n' % flac.filename)
             else:
-              self.stdout.write("invalid flac file: %s\n" % f)
+              stdout.write("new:     %s\n" % flac.filename)
+            self.flacs[flac.md5] = flac
+            self.flacs[flac.md5].verified = True
+            changed = True
+
           elif (os.path.isdir(fname) and not (f.startswith("."))):
-            self._scanpath(fname)
- 
+            changed |= self._scanpath(fname, stdout, fname_index)
+        return changed
+
 
 def filequote(s):
     """

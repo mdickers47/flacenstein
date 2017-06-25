@@ -260,8 +260,7 @@ if __name__ == '__main__':
 
   elif verb == 'scan':
 
-    lib.scan()
-    state_dirty = True
+    state_dirty = lib.scan()
 
   elif verb == 'update_tags':
 
