@@ -287,7 +287,7 @@ if __name__ == '__main__':
       print 'Argument %s must match 1 file in library, not %d' % \
         (args[1], len(flacs))
       sys.exit(1)
-      flacs[0].extractTrack(tracknum)
+    flacs[0].extractTrack(tracknum)
 
   elif verb == 'latest':
 
