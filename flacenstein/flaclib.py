@@ -280,7 +280,7 @@ class FlacLibrary:
               flac = FlacFile(fname)
               if not flac.md5: raise MetaflacFailed('missing md5')
             except MetaflacFailed:
-              stdout.write('invalid: %s\n % f')
+              stdout.write('invalid: %s\n' % f)
               continue
             if flac.md5 in self.flacs:
               del self.flacs[flac.md5]
