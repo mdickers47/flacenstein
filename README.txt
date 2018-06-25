@@ -50,11 +50,11 @@ flac-image
 
 flac-gui
 
-   Maintained until 2015, then abandoned in the face of yet another
-   pointless rewrite forced by mutation in the wxwidgets libraries.
-   Does not run today and is unlikely to be fixed by me.
+   Born 2004, died 2015 when it was abandoned in the face of yet
+   another pointless rewrite forced by mutation in the wxwidgets
+   libraries.  Does not run today and is unlikely to be fixed by me.
 
-   At different points in time flac-gui worked with cddb for automatic
+   At various points in time flac-gui worked with cddb for automatic
    identification of discs, then MusicBrainz when that was the fashion
    for five seconds, and even an Amazon API for automatic retrieval of
    cover art.  None of these fancy features ever had a half-life
@@ -75,7 +75,7 @@ flac-cli
    except to rip a new CD.  For that I now just use util/rip.sh, which
    does the same thing with 1% of the complexity.
 
-utils
+util
 
    A bunch of hacky scripts.  Mostly bash and mostly run on their own
    with no dependencies except the flac and metaflac binaries.  Some
