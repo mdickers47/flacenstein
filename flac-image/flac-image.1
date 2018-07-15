@@ -1,0 +1,77 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH FLAC-IMAGE 1 "January  2, 2006"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+flac-image \- stores and retrieves cover art images in FLAC files
+.SH SYNOPSIS
+.B flac-image
+.RI (\-x | \-i
+.IR imgfile
+| \-d | \-n | \-l) [-t 
+.IR mimetype
+]
+.IR flacfile
+.SH DESCRIPTION
+.B flac-image
+is a small utility for storing and retrieving arbitrary blocks of binary data in
+FLAC metadata blocks.  It is especially suitable for images, such as album cover
+art.  Therefore the application data blocks created and manipulated by this program
+will be called "image blocks" on this manpage.
+.SH OPTIONS
+.TP
+.B \-x
+Extract images in
+.IR flacfile
+to current directory.
+.TP
+.B \-i
+Insert
+.IR imagefile
+into
+.IR flacfile
+.TP
+.B \-d
+Delete all image blocks from
+.IR flacfile
+.TP
+.B \-n
+Extract only the smallest available image block to the current directory (this
+could be a thumbNail)
+.TP
+.B \-l
+List recognizable image blocks
+.TP
+.B \-t
+With \-i, label the inserted block as
+.IR mimetype
+instead of guessing by the filename.  With any other option, process only the
+blocks that match
+.IR mimetype
+.
+.SH SEE ALSO
+.BR flac (1),
+.BR metaflac (1).
+.sp
+The structure of the application data block used by
+.B flac-image
+is documented in the source code file, flac-image.h.  Don't be scared, it is
+barely 50 lines long.  The block should be fairly easy to parse from within
+other applications, using any of the available FLAC APIs.
+.SH AUTHOR
+flac-image was written by Michael A. Dickerson <mikey@singingtree.com>.  His web page,
+which might or might not have more information about this program, is at
+http://obstrepero.us.

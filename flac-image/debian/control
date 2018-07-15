@@ -1,0 +1,18 @@
+Source: flac-image
+Section: sound
+Priority: optional
+Maintainer: Michael A. Dickerson <mikey@singingtree.com>
+Build-Depends: debhelper (>= 4.0.0), libflac-dev (>=1.1.1-5)
+Depends: libflac6 (>=1.1.1-5)
+Standards-Version: 3.6.1
+
+Package: flac-image
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Utility to store and retrieve cover art images in FLAC files
+ flac-image is a tiny utility to store and retrieve cover art images
+ in FLAC files.  Actually, you can use it to store any arbitrary block
+ of data, or multiple blocks differentiated by MIME type if you wish.
+ .
+ flac-image is so trivial that it should probably exist as a patch to
+ metaflac, but that looked hard to write, so here it is.
