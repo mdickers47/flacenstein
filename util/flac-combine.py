@@ -24,8 +24,8 @@ import os
 import sys
 import wave
 
-from flacenstein import flaccfg
-
+BIN_FLAC = 'flac'
+BIN_METAFLAC = 'metaflac'
 CD_SAMPLES_PER_FRAME = 588 # 44100 samples/sec / 75 frames/sec
 SECONDS_PER_SEEKPOINT = 10.031 # magic number? observed to be what flac does
 
@@ -115,19 +115,19 @@ class outstream:
         # creating to force CD frame alignment.
         print 'Compressing...'
         os.system('%s --padding=%d --delete-input-file %s' % \
-                  (flaccfg.BIN_FLAC, 128*1024, self.filename))
+                  (BIN_FLAC, 128*1024, self.filename))
         print 'done.'
         # I know this sucks.
         self.filename = self.filename.replace('.wav', '.flac')
         
         print 'Creating seek table...',
         os.system('%s --add-seekpoint=%fs %s' %
-                  (flaccfg.BIN_METAFLAC, SECONDS_PER_SEEKPOINT, self.filename))
+                  (BIN_METAFLAC, SECONDS_PER_SEEKPOINT, self.filename))
         print 'done.'
 
         print 'Writing cuesheet...   ',
         cue = os.popen('%s --import-cuesheet-from=- %s' %
-                       (flaccfg.BIN_METAFLAC, self.filename), 'w')
+                       (BIN_METAFLAC, self.filename), 'w')
         cue.write('FILE "dummy.wav" WAVE\n')
         for i, off in enumerate(self.track_offsets):
             cue.write('  TRACK %02d AUDIO\n' % (i + 1))
@@ -141,7 +141,7 @@ class outstream:
 
         print 'Writing VORBIS tags...',
         tags = os.popen('%s --import-tags-from=- %s' %
-                        (flaccfg.BIN_METAFLAC, self.filename), 'w')
+                        (BIN_METAFLAC, self.filename), 'w')
         tags.write('ARTIST=\n'
                    'ALBUM=\n'
                    'DATE=\n')
