@@ -22,7 +22,7 @@ FLAC=$1
 echo FILE "$AUDIO" WAVE > $CUE
 metaflac --export-cuesheet-to=- "$FLAC" | grep -v FILE >> $CUE
 flac -f -o $AUDIO -d "$FLAC"
-cdrecord -dao --cuefile=$CUE
+cdrecord -raw --cuefile=$CUE
 
 if [ -z "$KEEP" ] ; then
   rm $CUE $AUDIO
